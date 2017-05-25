@@ -93,5 +93,5 @@
 ### 最后的效果如下
 
 
-![](http://chuantu.biz/t5/94/1495722766x2890171414.gif)
+![](https://github.com/itwen/VanGogh/blob/master/layou.gif)
 
