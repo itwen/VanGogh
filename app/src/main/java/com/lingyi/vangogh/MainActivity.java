@@ -36,27 +36,31 @@ public class MainActivity extends AppCompatActivity {
         layoutManager.setSpanSizeLookUp(new FlowGridLayoutManager.SpanSizeLookUp() {
             @Override
             int ItemCount() {
-                return items.size();
+                return items.size(); //所有的item个数
             }
 
             @Override
             public FlowGridLayoutManager.RowItem getRowSpanItem(int position) {
-                return items.get(position);
+//                FlowGridLayoutManager.RowItem item = new FlowGridLayoutManager.RowItem();
+//                item.setRowSpan(1);
+//                item.setColumnSpan(3);
+//                item.setIndex(1);
+                return items.get(position); //返回对应位置item  item的格式是 告诉recycleview 这个item占几行几列
             }
 
             @Override
             public int getRowSpancing() {
-                return defaultRowSpacing;
+                return defaultRowSpacing;//默认行间距
             }
 
             @Override
             public int getColumnSpacing() {
-                return defaultColumnSpacing;
+                return defaultColumnSpacing;//默认列间距
             }
 
             @Override
             public int getDefaultViewType() {
-                return DEFAULT_VIEW_TYPE;
+                return DEFAULT_VIEW_TYPE; //返回一个宫格item的默认viewtype  只有这个viewtype的item之间才会有间隔
             }
 
         });
@@ -218,12 +222,12 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onBindViewHolder(MyViewHolder holder, int position) {
             FlowGridLayoutManager.RowItem item = items.get(position);
-            holder.setStr(position, item,holder.getItemViewType());
+            holder.bindData(position, item,holder.getItemViewType());
         }
 
         @Override
         public int getItemViewType(int i) {
-            if (i == 0 || i == 4 || i == 22) {
+            if (i == 0 || i == 4 || i == 22) { //position 为这些的item 是另外一种type 但是这个type之间是没有行列间距的  可以没有其他type
                 return 0x02;
             }
             return DEFAULT_VIEW_TYPE;
@@ -244,16 +248,15 @@ public class MainActivity extends AppCompatActivity {
             strTv = (TextView) itemView.findViewById(R.id.str);
         }
 
-        public void setStr(final int str,FlowGridLayoutManager.RowItem item, int viewType) {
+        public void bindData(final int position, FlowGridLayoutManager.RowItem item, int viewType) {
             if (viewType == DEFAULT_VIEW_TYPE) {
-                strTv.setText(str + "");
+                strTv.setText(position + "");
                 int num = (int) (Math.random() * 16777216);
-
                 StringBuilder sb = new StringBuilder(Integer.toHexString(num));
                 while (sb.length() < 6){
                     sb.append("0");
                 }
-                Log.i("lingyilog", "setStr: color:"+sb);
+                Log.i("lingyilog", "bindData: color:"+sb);
                 itemView.setBackgroundColor(Color.parseColor("#"+sb));
                 RecyclerView.LayoutParams params = (RecyclerView.LayoutParams) itemView.getLayoutParams();
                 params.width = defaultWidth * item.getColumnSpan() + (item.getColumnSpan() - 1) * defaultColumnSpacing;
@@ -261,8 +264,8 @@ public class MainActivity extends AppCompatActivity {
                 itemView.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        Log.i("lingyilog", "onClick: position:" + str);
-                        Toast.makeText(MainActivity.this, "点击了第几个item：" + str, Toast.LENGTH_SHORT).show();
+                        Log.i("lingyilog", "onClick: position:" + position);
+                        Toast.makeText(MainActivity.this, "点击了第几个item：" + position, Toast.LENGTH_SHORT).show();
                     }
                 });
             }else{
@@ -272,7 +275,7 @@ public class MainActivity extends AppCompatActivity {
                 itemView.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        Toast.makeText(MainActivity.this, "我是title：" + str, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, "我是title：" + position, Toast.LENGTH_SHORT).show();
                     }
                 });
             }
