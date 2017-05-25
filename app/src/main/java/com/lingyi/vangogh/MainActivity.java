@@ -183,7 +183,7 @@ public class MainActivity extends AppCompatActivity {
         item.setIndex(17);
         item.setColumnSpan(2);
         items.add(item);
-        for (int i = 18; i < 28 ; i++) {
+        for (int i = 18; i < 900 ; i++) {
             if(i == 22){
                 item = new FlowGridLayoutManager.RowItem();
                 item.setRowSpan(1);
