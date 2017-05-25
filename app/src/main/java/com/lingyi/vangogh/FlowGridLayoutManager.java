@@ -357,7 +357,7 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
          * @return
          */
         public ItemPositionInfo getItemPositionInfo(int position){
-            if(position > mRowItemInfos.size()){
+            if(position >= mRowItemInfos.size()){
                 return new ItemPositionInfo(0,0,new RowItem(),0);
             }
 
