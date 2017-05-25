@@ -1,12 +1,16 @@
 ##一款强大的recycleview布局管理器
+
 ###像gridlayoumanager的瀑布流布局，gridlayout只支持合并列，不支持合并行，这个做到了瀑布流和gridlayout布局双重特点，任一行列合并单元格，使用简单。
+
 ##使用姿势
 
 ```
  FlowGridLayoutManager layoutManager = new FlowGridLayoutManager(3, defaultWidth, defaultWidth);
 
 ``` 
+
 ###第一个参数3指定纵向总共几列，第二三个参数传入一个默认单元格的默认宽高，
+
 
 ```
         layoutManager.setSpanSizeLookUp(new FlowGridLayoutManager.SpanSizeLookUp() {
@@ -44,7 +48,9 @@
          recyclerView.setLayoutManager(layoutManager);
 ```
 
+
 ###然后在创建一个adapter
+
 
 ```
     class MyAdapter extends RecyclerView.Adapter<MyViewHolder> {
@@ -83,7 +89,9 @@
 
 ```
 
+
 ###最后的效果如下
+
 
 ![](http://chuantu.biz/t5/94/1495722766x2890171414.gif)
 
