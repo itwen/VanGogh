@@ -23,9 +23,6 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
     private SparseArray<Rect> allItemFrames = new SparseArray<>();
 
     private int mNumcolumnsPerRow = 3;//每行分成几等分
-    private int mDefaultWidth; //每行默认宽度
-    private int mDefaultHeight; //每行默认高度
-
 
     private int mLastVisibleRowIndex = 0; //最后一个可见item的position
     private int mFirstVisibleRowIndex = 0;//第一个可见item的position
@@ -35,10 +32,8 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
     private Map<Integer,Map<Integer,Integer>> positionMapViewTypes = new HashMap<>(); //记录每个position对应的他当前位置不同的viewtype分别有多少个
 
 
-    public FlowGridLayoutManager(int columnSpan, int defaultWidth, int defaultHeight){
+    public FlowGridLayoutManager(int columnSpan){
         this.mNumcolumnsPerRow = columnSpan;
-        this.mDefaultHeight = defaultHeight;
-        this.mDefaultWidth = defaultWidth;
     }
 
     @Override
@@ -132,7 +127,6 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
                 if (getDecoratedTop(child) - dy > getHeight() - getPaddingBottom()) {
                     removeAndRecycleView(child, recycler);
                     mLastVisibleRowIndex--;
-                    spansizeLookUp.rollbackRowIndex(i);//回收后需要重新计算最下面的item对应的行号
                     continue;
                 }
             }
@@ -147,7 +141,27 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
             Rect frame = allItemFrames.get(i);
             if(frame == null)continue;
             if(frame.bottom - verticalScrollOffset - dy < getPaddingTop()){
-//                  mFirstVisibleRowIndex = i+1;
+//                  mFirstVisibleRowIndex = i+1; //这里当前view没显示在屏幕上 并不代表下一个view不显示在屏幕上，因为这是不规则的、
+                /**
+                 *    —————————————————
+                 *   |         |       |
+                 *   |         |       |
+                 *   |         |    1  |
+                 *   |         |       |
+                 *   |     0   |—————— |
+                 *   |         |       |
+                 *   |         |     2 |
+                 *   |         |       |
+                 *   | ————————————————|
+                 *   |
+                 *   |    3
+                 *   |
+                 *
+                 *     例如 现在从上往下滑动 3此时显示在屏幕上 0 ，1，2  在屏幕上边缘外，继续滑动
+                 *     这时候计算到position 2  应该出现在屏幕上了，把2添加进去，但是继续判断 1 此时1的bottom在屏幕外不应显示出来，如果现在是一个规则的布局
+                 *     1以下的view按理都不可能显示在屏幕中了  但是这是一个不规则的布局，虽然1没有显示在屏幕上，但是0已经出现了，position 0 应该显示出来。。。。
+                  *
+                 */
 //                 break;
             }else{
                 boolean hasAdd = false;
@@ -161,7 +175,7 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
                 }
                 if(!hasAdd){
                     View scrap = recycler.getViewForPosition(i);
-                    addView(scrap);
+                    addView(scrap,0);
                     measureChild(scrap,0,0);
                     layoutDecorated(scrap,
                             frame.left,
@@ -203,38 +217,46 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
             Rect frame = allItemFrames.get(i);
             if (frame == null) {
                 frame = new Rect();
-            }
-            ItemPositionInfo posInfo = spansizeLookUp.getItemPositionInfo(i);
-            RowItem item = spansizeLookUp.getRowSpanItem(i);
-            int viewType = getItemViewType(child);
-            Map<Integer,Integer> viewtypeCount = new HashMap<>();
-            if(i > 0){//主要是用来记录当前position下的每个viewtype的数量
-                if(!positionMapViewTypes.containsKey(i)){
-                    viewtypeCount = positionMapViewTypes.get(i-1);
-                    Map<Integer,Integer> copy = new HashMap<>();
-                    copy.putAll(viewtypeCount);
-                    if(copy.containsKey(viewType)){
-                        copy.put(viewType,copy.get(viewType)+1);
-                    }else{
-                        copy.put(viewType,1);
+                ItemPositionInfo posInfo = spansizeLookUp.getItemPositionInfo(i);
+                RowItem item = spansizeLookUp.getRowSpanItem(i);
+                int viewType = getItemViewType(child);
+                Map<Integer,Integer> viewtypeCount = new HashMap<>();
+                if(i > 0){//主要是用来记录当前position下的每个viewtype的数量
+                    if(!positionMapViewTypes.containsKey(i)){
+                        viewtypeCount = positionMapViewTypes.get(i-1);
+                        Map<Integer,Integer> copy = new HashMap<>();
+                        copy.putAll(viewtypeCount);
+                        if(copy.containsKey(viewType)){
+                            copy.put(viewType,copy.get(viewType)+1);
+                        }else{
+                            copy.put(viewType,1);
+                        }
+                        positionMapViewTypes.put(i,copy);
                     }
-                    positionMapViewTypes.put(i,copy);
+                }else{
+                    viewtypeCount.put(viewType,1);
+                    positionMapViewTypes.clear();
+                    positionMapViewTypes.put(i,viewtypeCount);
                 }
-            }else{
-                viewtypeCount.put(viewType,1);
-                positionMapViewTypes.clear();
-                positionMapViewTypes.put(i,viewtypeCount);
+                if(!mViewTypeSizes.containsKey(viewType)){
+                    int defaultWidth = width;
+                    int defaultHeight = height;
+                    if(viewType == spansizeLookUp.getDefaultViewType()){
+                        defaultWidth = (width - spansizeLookUp.getColumnSpacing()*(item.getColumnSpan()-1))/ item.getColumnSpan();
+                        defaultHeight = (height - spansizeLookUp.getRowSpancing() * (item.getColumnSpan()-1)) / item.getRowSpan();
+                    }
+                    ViewTypeSize  viewTypeSize = new ViewTypeSize(defaultWidth,defaultHeight);
+                    item.setDefaultHeight(defaultHeight);
+                    item.setDefaultWidth(defaultWidth);
+                    mViewTypeSizes.put(viewType,viewTypeSize);
+                }
+                int leftOffset = caculateLeftOffset(posInfo.getmCurrentColumnIndex());
+                int top = caculateTopOffset(i,viewType,posInfo.getRowIndex() - item.getRowSpan());
+                frame.set(leftOffset,top, leftOffset+width, top + height);
+                // 将当前的Item的Rect边界数据保存
+                allItemFrames.put(i, frame);
             }
-            if(!mViewTypeSizes.containsKey(viewType)){
-                ViewTypeSize  viewTypeSize = new ViewTypeSize(width,height);
-                mViewTypeSizes.put(viewType,viewTypeSize);
-            }
-            int leftOffset = caculateLeftOffset(posInfo.getmCurrentColumnIndex());
-            int top = caculateTopOffset(i,viewType,posInfo.getRowIndex() - item.getRowSpan());
-            frame.set(leftOffset,top, leftOffset+width, top + height);
-            // 将当前的Item的Rect边界数据保存
-            allItemFrames.put(i, frame);
-            topOffset = top - verticalScrollOffset;//判断上一个view的下边界是否已经完全出来，如果没有  那当前这个view不用展示
+            topOffset = frame.top - verticalScrollOffset;//判断这个view的头部是否已经露出屏幕下边缘，如果没有  那当前这个view不用展示
             if(topOffset -dy > getHeight() -getPaddingBottom()){
                 mLastVisibleRowIndex = i -1;
                 allItemFrames.remove(i);
@@ -254,7 +276,6 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
                 if (gap > 0) {
                     dy -= gap;
                 }
-
             }
         }
 
@@ -278,19 +299,19 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
         private List<Integer> mColumnPointRowIndex = new ArrayList<>();//记录当前最下面的item的行号
         private Map<Integer,ItemPositionInfo> mRowItemInfos = new HashMap<>();
         private int mNumcolumnsPerRow = 3;
-        abstract int ItemCount();
+        public abstract int ItemCount();
         public abstract  RowItem getRowSpanItem(int position);
         public abstract int getRowSpancing();
         public abstract int getColumnSpacing();
         public abstract int getDefaultViewType ();
         public SpanSizeLookUp(){
+        }
+        private void setNumColumnCount(int numcolumnCount){
+            this.mNumcolumnsPerRow = numcolumnCount;
             mColumnPointRowIndex = new ArrayList<>();
             for(int i = 0 ; i < mNumcolumnsPerRow ; i++){
                 mColumnPointRowIndex.add(0);
             }
-        }
-        private void setNumColumnCount(int numcolumnCount){
-            this.mNumcolumnsPerRow = numcolumnCount;
         }
 
         /**
@@ -366,11 +387,59 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
 
     }
 
-    public static class RowItem{
+    public static class RowItem<T extends Object>{
         private int columnSpan;//所占的列的宽度
         private int RowSpan;//所占的行的宽度
         private int index;//item index
         private int viewType = 0; //viewTye  以后做支持多类型扩展
+        private int columnSpacing;
+        private int rowSpacing;
+        private T itemData;
+        private int defaultWidth;
+        private int defaultHeight;
+
+        public int getDefaultWidth() {
+            return defaultWidth;
+        }
+
+        public void setDefaultWidth(int defaultWidth) {
+            this.defaultWidth = defaultWidth;
+        }
+
+        public int getDefaultHeight() {
+            return defaultHeight;
+        }
+
+        public void setDefaultHeight(int defaultHeight) {
+            this.defaultHeight = defaultHeight;
+        }
+
+        public int getColumnSpacing() {
+            return columnSpacing;
+        }
+
+        public void setColumnSpacing(int columnSpacing) {
+            this.columnSpacing = columnSpacing;
+        }
+
+        public int getRowSpacing() {
+            return rowSpacing;
+        }
+
+        public void setRowSpacing(int rowSpacing) {
+            this.rowSpacing = rowSpacing;
+        }
+
+        public T getItemData() {
+            if(itemData == null){
+                itemData = (T) new Object();
+            }
+            return itemData;
+        }
+
+        public void setItemData(T itemData) {
+            this.itemData = itemData;
+        }
 
         public int getViewType() {
             return viewType;
@@ -417,7 +486,7 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
         }
 
         @Override
-        int ItemCount() {
+        public int ItemCount() {
             return itemCount;
         }
 
@@ -444,6 +513,7 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
         public int getDefaultViewType() {
             return 0;
         }
+
 
     }
 
@@ -484,7 +554,7 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
         int notDefaultViewTypeCount = 0 ;
         if(currentRowIndex == 0)return topOffset;
         Map<Integer,Integer> typeCount = positionMapViewTypes.get(position);
-        for(Integer key:typeCount.keySet()){
+        for(Integer key:typeCount.keySet()){  //这段逻辑真的死恶心  不是宫格的view 不能让他有行列间隔，因为为了避免可能 titleview的间隔小于行列间隔
             if(key != spansizeLookUp.getDefaultViewType()){
                 ViewTypeSize size = mViewTypeSizes.get(key);
                 int count = typeCount.get(key);
@@ -499,13 +569,21 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
         if(spacingCount < 0){
             spacingCount = 0;
         }
-        topOffset += spacingCount*spansizeLookUp.getRowSpancing()+mDefaultHeight*(currentRowIndex - notDefaultViewTypeCount);
+        int defaultHeight = 0;
+        if(mViewTypeSizes.containsKey(spansizeLookUp.getDefaultViewType())){
+            defaultHeight = mViewTypeSizes.get(spansizeLookUp.getDefaultViewType()).getmDefaulTHeight();
+        }
+        topOffset += spacingCount*spansizeLookUp.getRowSpancing()+defaultHeight*(currentRowIndex - notDefaultViewTypeCount);
         return topOffset;
     }
 
     private int caculateLeftOffset(int currentColumnIndex){
         int leftOffset = getPaddingLeft();
-        leftOffset += (currentColumnIndex * (spansizeLookUp.getColumnSpacing() + mDefaultWidth));
+        int defaultWidth = 0;
+        if(mViewTypeSizes.containsKey(spansizeLookUp.getDefaultViewType())){
+            defaultWidth = mViewTypeSizes.get(spansizeLookUp.getDefaultViewType()).getmDefaultWidth();
+        }
+        leftOffset += (currentColumnIndex * (spansizeLookUp.getColumnSpacing() + defaultWidth));
         return leftOffset;
     }
 }
