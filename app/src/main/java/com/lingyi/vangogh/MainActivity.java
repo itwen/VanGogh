@@ -4,6 +4,7 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -209,7 +210,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public MyViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
 
-            //Log.i("lingyilog", "onCreateViewHolder: viewType:"+viewType);
+            Log.i("lingyilog", "onCreateViewHolder: viewType:"+viewType);
             if (viewType == DEFAULT_VIEW_TYPE) {
                 View v = LayoutInflater.from(MainActivity.this).inflate(R.layout.recycler_view_item, parent, false);
                 MyViewHolder viewHolder = new MyViewHolder(v);
@@ -223,7 +224,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onBindViewHolder(MyViewHolder holder, int position) {
             FlowGridLayoutManager.RowItem item = items.get(position);
-            //Log.i("lingyilog", "onBindViewHolder: position"+position);
+            Log.i("lingyilog", "onBindViewHolder: position"+position);
             holder.bindData(position, item,holder.getItemViewType());
         }
 

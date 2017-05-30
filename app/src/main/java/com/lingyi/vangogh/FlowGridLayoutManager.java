@@ -1,7 +1,10 @@
 package com.lingyi.vangogh;
 
 import android.graphics.Rect;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.util.SparseArray;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,7 +23,7 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
     private int verticalScrollOffset = 0;
 
     //保存所有的Item的上下左右的偏移量信息
-    private SparseArray<Rect> allItemFrames = new SparseArray<>();
+    private SparseArray<Object> allItemFrames = new SparseArray<>();
 
     private int mNumcolumnsPerRow = 3;//每行分成几等分
 
@@ -28,12 +31,13 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
     private int mFirstVisibleRowIndex = 0;//第一个可见item的position
     private SpanSizeLookUp spansizeLookUp;
 
-    private Map<Integer,ViewTypeSize> mViewTypeSizes = new HashMap<>(); //记录每种viewtype  分别得大小
-    private Map<Integer,Map<Integer,Integer>> positionMapViewTypes = new HashMap<>(); //记录每个position对应的他当前位置不同的viewtype分别有多少个
+    private HashMap<Integer,ViewTypeSize> mViewTypeSizes = new HashMap<>(); //记录每种viewtype  分别得大小
+    private HashMap<Integer,HashMap<Integer,Integer>> positionMapViewTypes = new HashMap<>(); //记录每个position对应的他当前位置不同的viewtype分别有多少个
 
 
     public FlowGridLayoutManager(int columnSpan){
         this.mNumcolumnsPerRow = columnSpan;
+        mFirstVisibleRowIndex = 0;
     }
 
     @Override
@@ -44,7 +48,6 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
         if (state.isPreLayout()) {
             return;
         }
-
         if(spansizeLookUp == null){
             spansizeLookUp = new DefualtSpanSizeLookUp(mNumcolumnsPerRow,getItemCount());
             spansizeLookUp.caculateRowItemInfo();
@@ -52,7 +55,6 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
         //在布局之前，将所有的子View先Detach掉，放入到Scrap缓存中
         detachAndScrapAttachedViews(recycler);
 
-        mFirstVisibleRowIndex = 0;
         mLastVisibleRowIndex = getItemCount();
 
         fill(recycler,state,0);//填充可见区域的item
@@ -81,7 +83,6 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
             return 0;
         }
         int realOffset = dy;//实际滑动的距离， 可能会在边界处被修复
-        //边界修复代码
 
         //边界修复代码
         if (verticalScrollOffset + realOffset < 0) {//上边界
@@ -119,6 +120,43 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
         return realOffset;
     }
 
+//    @Override
+//    public Parcelable onSaveInstanceState() {
+//        SaveState bean = new SaveState();
+//        bean.allItemsFrames = allItemFrames;
+//        bean.mViewTypeSizes = mViewTypeSizes;
+//        bean.positionMapViewTypes = positionMapViewTypes;
+//        bean.mFirstVisibleRowIndex = mFirstVisibleRowIndex;
+//        bean.mLastVisibleRowIndex = mLastVisibleRowIndex;
+//        bean.mNumcolumnsPerRow = mNumcolumnsPerRow;
+//        Log.i("FlowGridLayoutManager", "onSaveInstanceState: mfirst:"+mFirstVisibleRowIndex);
+//        return bean;
+//    }
+//
+//
+//    @Override
+//    public void onRestoreInstanceState(Parcelable state) {
+//        super.onRestoreInstanceState(state);
+//        if(state instanceof SaveState){
+//            SaveState bean = (SaveState) state;
+//            allItemFrames = bean.allItemsFrames;
+//            mViewTypeSizes = bean.mViewTypeSizes;
+//            positionMapViewTypes = bean.positionMapViewTypes;
+//            mFirstVisibleRowIndex = bean.mFirstVisibleRowIndex;
+//            mLastVisibleRowIndex = bean.mLastVisibleRowIndex;
+//            mNumcolumnsPerRow = bean.mNumcolumnsPerRow;
+//
+//            Log.i("FlowGridLayoutManager", "onRestoreInstanceState: mfirst:"+mFirstVisibleRowIndex);
+//        }
+//    }
+
+    /**
+     * 从下往上逆序填充  手机从上往下滑动的时候
+     * @param recycler
+     * @param state
+     * @param dy 滑动距离
+     * @return 实际位移距离
+     */
     private int fillUp(RecyclerView.Recycler recycler, RecyclerView.State state,int dy){
         //回收越界子View
         if (getChildCount() > 0) {//滑动时进来的 回收当前屏幕，下越界的View
@@ -137,11 +175,11 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
             View firstView = getChildAt(0);
             maxPos = getPosition(firstView) + mNumcolumnsPerRow;//避免不规则不出现 所以从第一个child开始再往后加一列
         }
-        for(int i = maxPos ; i >= mFirstVisibleRowIndex ; i--){
-            Rect frame = allItemFrames.get(i);
+        for(int i = maxPos ; i >= 0 ; i--){
+            Rect frame = (Rect) allItemFrames.get(i);
             if(frame == null)continue;
             if(frame.bottom - verticalScrollOffset - dy < getPaddingTop()){
-//                  mFirstVisibleRowIndex = i+1; //这里当前view没显示在屏幕上 并不代表下一个view不显示在屏幕上，因为这是不规则的、
+                 // mFirstVisibleRowIndex = i+1; //这里当前view没显示在屏幕上 并不代表下一个view不显示在屏幕上，因为这是不规则的、
                 /**
                  *    —————————————————
                  *   |         |       |
@@ -152,7 +190,7 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
                  *   |         |       |
                  *   |         |     2 |
                  *   |         |       |
-                 *   | ————————————————|
+                 *   |——————— ———————— |
                  *   |
                  *   |    3
                  *   |
@@ -160,10 +198,11 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
                  *     例如 现在从上往下滑动 3此时显示在屏幕上 0 ，1，2  在屏幕上边缘外，继续滑动
                  *     这时候计算到position 2  应该出现在屏幕上了，把2添加进去，但是继续判断 1 此时1的bottom在屏幕外不应显示出来，如果现在是一个规则的布局
                  *     1以下的view按理都不可能显示在屏幕中了  但是这是一个不规则的布局，虽然1没有显示在屏幕上，但是0已经出现了，position 0 应该显示出来。。。。
-                  *
+                 *
                  */
 //                 break;
             }else{
+                mFirstVisibleRowIndex = i;
                 boolean hasAdd = false;
                 for(int childIndex = 0 ; childIndex < getChildCount() ; childIndex++){
                     View child = getChildAt(childIndex);
@@ -185,9 +224,16 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
                 }
             }
         }
-
         return dy;
     }
+
+    /**
+     * 从上往下填充
+     * @param recycler
+     * @param state
+     * @param dy 滑动距离
+     * @return  实际位移距离
+     */
     private int  fillDown(RecyclerView.Recycler recycler, RecyclerView.State state,int dy){
         int topOffset = getPaddingTop();
         //回收越界子View
@@ -196,12 +242,12 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
                 View child = getChildAt(i);
                 if (getDecoratedBottom(child) - dy < topOffset) {
                     removeAndRecycleView(child, recycler);
-                    mFirstVisibleRowIndex++;
+                    mFirstVisibleRowIndex = getPosition(getChildAt(0));
                     continue;
                 }
             }
         }
-
+        Log.i("FlowGridLayoutManager", "fillDown: mfirst:"+mFirstVisibleRowIndex);
         int minPos = mFirstVisibleRowIndex;
         mLastVisibleRowIndex = getItemCount() -1;
         if(getChildCount() > 0){
@@ -214,17 +260,17 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
             measureChild(child,0,0);
             int width = getDecoratedMeasuredWidth(child);
             int height = getDecoratedMeasuredHeight(child);
-            Rect frame = allItemFrames.get(i);
+            Rect frame = (Rect) allItemFrames.get(i);
             if (frame == null) {
                 frame = new Rect();
                 ItemPositionInfo posInfo = spansizeLookUp.getItemPositionInfo(i);
                 RowItem item = spansizeLookUp.getRowSpanItem(i);
                 int viewType = getItemViewType(child);
-                Map<Integer,Integer> viewtypeCount = new HashMap<>();
+                HashMap<Integer,Integer> viewtypeCount = new HashMap<>();
                 if(i > 0){//主要是用来记录当前position下的每个viewtype的数量
                     if(!positionMapViewTypes.containsKey(i)){
                         viewtypeCount = positionMapViewTypes.get(i-1);
-                        Map<Integer,Integer> copy = new HashMap<>();
+                        HashMap<Integer,Integer> copy = new HashMap<>();
                         copy.putAll(viewtypeCount);
                         if(copy.containsKey(viewType)){
                             copy.put(viewType,copy.get(viewType)+1);
@@ -278,7 +324,6 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
                 }
             }
         }
-
         return dy;
     }
     private int getVerticalSpace() {
@@ -384,7 +429,6 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
 
             return mRowItemInfos.get(position);
         }
-
     }
 
     public static class RowItem<T extends Object>{
@@ -517,9 +561,38 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
 
     }
 
-    public static class ViewTypeSize{
+    public static class ViewTypeSize implements Parcelable{
         private int mDefaultWidth;
         private int mDefaulTHeight;
+
+
+        protected ViewTypeSize(Parcel in) {
+            mDefaultWidth = in.readInt();
+            mDefaulTHeight = in.readInt();
+        }
+
+        @Override
+        public void writeToParcel(Parcel dest, int flags) {
+            dest.writeInt(mDefaultWidth);
+            dest.writeInt(mDefaulTHeight);
+        }
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        public static final Creator<ViewTypeSize> CREATOR = new Creator<ViewTypeSize>() {
+            @Override
+            public ViewTypeSize createFromParcel(Parcel in) {
+                return new ViewTypeSize(in);
+            }
+
+            @Override
+            public ViewTypeSize[] newArray(int size) {
+                return new ViewTypeSize[size];
+            }
+        };
 
         public int getmDefaultWidth() {
             return mDefaultWidth;
@@ -586,4 +659,55 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
         leftOffset += (currentColumnIndex * (spansizeLookUp.getColumnSpacing() + defaultWidth));
         return leftOffset;
     }
+
+
+//    public static class SaveState implements Parcelable{
+//        int verticalScrollOffset = 0;
+//        HashMap<Integer,ViewTypeSize> mViewTypeSizes;
+//        SparseArray<Object> allItemsFrames ;
+//        int mNumcolumnsPerRow ;
+//        int mLastVisibleRowIndex = 0;
+//        int mFirstVisibleRowIndex = 0;
+//        HashMap<Integer,HashMap<Integer,Integer>> positionMapViewTypes;
+//        public SaveState(){}
+//
+//        protected SaveState(Parcel in) {
+//            verticalScrollOffset = in.readInt();
+//            mNumcolumnsPerRow = in.readInt();
+//            mLastVisibleRowIndex = in.readInt();
+//            mFirstVisibleRowIndex = in.readInt();
+//
+//            mViewTypeSizes = in.readHashMap(FlowGridLayoutManager.class.getClassLoader());
+//            positionMapViewTypes = in.readHashMap(FlowGridLayoutManager.class.getClassLoader());
+//            allItemsFrames = in.readSparseArray(FlowGridLayoutManager.class.getClassLoader());
+//        }
+//
+//        @Override
+//        public void writeToParcel(Parcel dest, int flags) {
+//            dest.writeInt(verticalScrollOffset);
+//            dest.writeInt(mNumcolumnsPerRow);
+//            dest.writeInt(mLastVisibleRowIndex);
+//            dest.writeInt(mFirstVisibleRowIndex);
+//            dest.writeMap(mViewTypeSizes);
+//            dest.writeMap(positionMapViewTypes);
+//            dest.writeSparseArray(allItemsFrames);
+//        }
+//
+//        @Override
+//        public int describeContents() {
+//            return 0;
+//        }
+//
+//        public static final Creator<SaveState> CREATOR = new Creator<SaveState>() {
+//            @Override
+//            public SaveState createFromParcel(Parcel in) {
+//                return new SaveState(in);
+//            }
+//
+//            @Override
+//            public SaveState[] newArray(int size) {
+//                return new SaveState[size];
+//            }
+//        };
+//    }
 }
