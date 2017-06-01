@@ -18,9 +18,10 @@ public class MainActivity extends AppCompatActivity {
     private RecyclerView recyclerView;
     private List<FlowGridLayoutManager.RowItem> items;
     private int defaultWidth = 0;
-    private int defaultColumnSpacing = 12;
-    private int defaultRowSpacing = 24;
+    private int defaultColumnSpacing = 24;
+    private int defaultRowSpacing = 18;
     private final static int DEFAULT_VIEW_TYPE = 0x01;
+    private final static int TITLE_VIEW_TYPE = 0x02;
     private TextView mChildCount;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,10 +35,6 @@ public class MainActivity extends AppCompatActivity {
         recyclerView.setPadding(24, 24, 24, 0);
         FlowGridLayoutManager layoutManager = new FlowGridLayoutManager(3);
         layoutManager.setSpanSizeLookUp(new FlowGridLayoutManager.SpanSizeLookUp() {
-            @Override
-           public int ItemCount() {
-                return items.size(); //所有的item个数
-            }
 
             @Override
             public FlowGridLayoutManager.RowItem getRowSpanItem(int position) {
@@ -50,17 +47,21 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public int getRowSpancing() {
-                return defaultRowSpacing;//默认行间距
+
+                return defaultRowSpacing;
             }
 
             @Override
             public int getColumnSpacing() {
-                return defaultColumnSpacing;//默认列间距
+                return defaultColumnSpacing;
             }
 
             @Override
-            public int getDefaultViewType() {
-                return DEFAULT_VIEW_TYPE; //返回一个宫格item的默认viewtype  只有这个viewtype的item之间才会有间隔
+            public boolean shouldViewTypeHaveSpacing(int viewType) {
+                if(viewType == DEFAULT_VIEW_TYPE){
+                    return true;
+                }
+                return false;
             }
 
         });
@@ -83,17 +84,20 @@ public class MainActivity extends AppCompatActivity {
         item.setRowSpan(1);
         item.setColumnSpan(3);
         item.setIndex(1);
+        item.setViewType(TITLE_VIEW_TYPE);
         items.add(item);
 
         item = new FlowGridLayoutManager.RowItem();
         item.setRowSpan(1);
         item.setColumnSpan(1);
         item.setIndex(1);
+        item.setViewType(DEFAULT_VIEW_TYPE);
         items.add(item);
 
         item = new FlowGridLayoutManager.RowItem();
         item.setRowSpan(2);
         item.setIndex(2);
+        item.setViewType(DEFAULT_VIEW_TYPE);
         item.setColumnSpan(2);
         items.add(item);
 
@@ -101,12 +105,14 @@ public class MainActivity extends AppCompatActivity {
         item.setRowSpan(1);
         item.setIndex(3);
         item.setColumnSpan(1);
+        item.setViewType(DEFAULT_VIEW_TYPE);
         items.add(item);
 
         item = new FlowGridLayoutManager.RowItem();
         item.setRowSpan(1);
         item.setIndex(4);
         item.setColumnSpan(3);
+        item.setViewType(TITLE_VIEW_TYPE);
         items.add(item);
 
 
@@ -114,78 +120,91 @@ public class MainActivity extends AppCompatActivity {
         item.setRowSpan(2);
         item.setIndex(5);
         item.setColumnSpan(2);
+        item.setViewType(DEFAULT_VIEW_TYPE);
         items.add(item);
 
         item = new FlowGridLayoutManager.RowItem();
         item.setRowSpan(1);
         item.setIndex(6);
         item.setColumnSpan(1);
+        item.setViewType(DEFAULT_VIEW_TYPE);
         items.add(item);
 
         item = new FlowGridLayoutManager.RowItem();
         item.setRowSpan(1);
         item.setIndex(7);
         item.setColumnSpan(1);
+        item.setViewType(DEFAULT_VIEW_TYPE);
         items.add(item);
 
 
         item.setRowSpan(1);
         item.setColumnSpan(1);
         item.setIndex(8);
+        item.setViewType(DEFAULT_VIEW_TYPE);
         items.add(item);
 
         item = new FlowGridLayoutManager.RowItem();
         item.setRowSpan(2);
         item.setIndex(9);
         item.setColumnSpan(2);
+        item.setViewType(DEFAULT_VIEW_TYPE);
         items.add(item);
 
         item = new FlowGridLayoutManager.RowItem();
         item.setRowSpan(1);
         item.setIndex(10);
         item.setColumnSpan(1);
+        item.setViewType(DEFAULT_VIEW_TYPE);
         items.add(item);
 
         item = new FlowGridLayoutManager.RowItem();
         item.setRowSpan(2);
         item.setIndex(11);
         item.setColumnSpan(2);
+        item.setViewType(DEFAULT_VIEW_TYPE);
         items.add(item);
 
         item = new FlowGridLayoutManager.RowItem();
         item.setRowSpan(1);
         item.setIndex(12);
         item.setColumnSpan(1);
+        item.setViewType(DEFAULT_VIEW_TYPE);
         items.add(item);
 
         item = new FlowGridLayoutManager.RowItem();
         item.setRowSpan(1);
         item.setIndex(13);
         item.setColumnSpan(1);
+        item.setViewType(DEFAULT_VIEW_TYPE);
         items.add(item);
 
         item = new FlowGridLayoutManager.RowItem();
         item.setRowSpan(2);
         item.setIndex(14);
         item.setColumnSpan(1);
+        item.setViewType(DEFAULT_VIEW_TYPE);
         items.add(item);
 
         item = new FlowGridLayoutManager.RowItem();
         item.setRowSpan(2);
         item.setIndex(15);
         item.setColumnSpan(1);
+        item.setViewType(DEFAULT_VIEW_TYPE);
         items.add(item);
 
         item = new FlowGridLayoutManager.RowItem();
         item.setRowSpan(2);
         item.setIndex(16);
         item.setColumnSpan(1);
+        item.setViewType(DEFAULT_VIEW_TYPE);
         items.add(item);
 
         item = new FlowGridLayoutManager.RowItem();
         item.setRowSpan(4);
         item.setIndex(17);
         item.setColumnSpan(2);
+        item.setViewType(DEFAULT_VIEW_TYPE);
         items.add(item);
         for (int i = 18; i < 900 ; i++) {
             if(i == 22){
@@ -194,12 +213,14 @@ public class MainActivity extends AppCompatActivity {
                 item.setIndex(i);
                 item.setColumnSpan(3);
                 items.add(item);
+                item.setViewType(TITLE_VIEW_TYPE);
                 continue;
             }
             item = new FlowGridLayoutManager.RowItem();
             item.setRowSpan(1);
             item.setIndex(i);
             item.setColumnSpan(1);
+            item.setViewType(DEFAULT_VIEW_TYPE);
             items.add(item);
         }
     }

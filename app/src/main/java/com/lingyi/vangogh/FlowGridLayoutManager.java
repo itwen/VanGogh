@@ -1,18 +1,13 @@
 package com.lingyi.vangogh;
 
 import android.graphics.Rect;
-import android.os.Parcel;
-import android.os.Parcelable;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.util.SparseArray;
 import android.view.View;
 import android.view.ViewGroup;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Created by lingyi on 2017/5/24.
@@ -21,7 +16,6 @@ import java.util.Map;
 public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
 
     private int verticalScrollOffset = 0;
-
     //保存所有的Item的上下左右的偏移量信息
     private SparseArray<Object> allItemFrames = new SparseArray<>();
 
@@ -30,10 +24,6 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
     private int mLastVisibleRowIndex = 0; //最后一个可见item的position
     private int mFirstVisibleRowIndex = 0;//第一个可见item的position
     private SpanSizeLookUp spansizeLookUp;
-
-    private HashMap<Integer,ViewTypeSize> mViewTypeSizes = new HashMap<>(); //记录每种viewtype  分别得大小
-    private HashMap<Integer,HashMap<Integer,Integer>> positionMapViewTypes = new HashMap<>(); //记录每个position对应的他当前位置不同的viewtype分别有多少个
-
 
     public FlowGridLayoutManager(int columnSpan){
         this.mNumcolumnsPerRow = columnSpan;
@@ -48,9 +38,12 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
         if (state.isPreLayout()) {
             return;
         }
-        if(spansizeLookUp == null){
-            spansizeLookUp = new DefualtSpanSizeLookUp(mNumcolumnsPerRow,getItemCount());
-            spansizeLookUp.caculateRowItemInfo();
+        if(this.spansizeLookUp == null){
+            this.spansizeLookUp = new DefualtSpanSizeLookUp();
+        }
+
+        if(spansizeLookUp.mNumcolumnsPerRow == 0){
+            this.spansizeLookUp.setNumColumnCount(this.mNumcolumnsPerRow,getPaddingTop(),getPaddingLeft());
         }
         //在布局之前，将所有的子View先Detach掉，放入到Scrap缓存中
         detachAndScrapAttachedViews(recycler);
@@ -72,8 +65,6 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
     public void setSpanSizeLookUp(SpanSizeLookUp spansize){
         if(spansize != null){
             this.spansizeLookUp = spansize;
-            this.spansizeLookUp.setNumColumnCount(this.mNumcolumnsPerRow);
-            this.spansizeLookUp.caculateRowItemInfo();
         }
     }
     @Override
@@ -119,36 +110,6 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
         }
         return realOffset;
     }
-
-//    @Override
-//    public Parcelable onSaveInstanceState() {
-//        SaveState bean = new SaveState();
-//        bean.allItemsFrames = allItemFrames;
-//        bean.mViewTypeSizes = mViewTypeSizes;
-//        bean.positionMapViewTypes = positionMapViewTypes;
-//        bean.mFirstVisibleRowIndex = mFirstVisibleRowIndex;
-//        bean.mLastVisibleRowIndex = mLastVisibleRowIndex;
-//        bean.mNumcolumnsPerRow = mNumcolumnsPerRow;
-//        Log.i("FlowGridLayoutManager", "onSaveInstanceState: mfirst:"+mFirstVisibleRowIndex);
-//        return bean;
-//    }
-//
-//
-//    @Override
-//    public void onRestoreInstanceState(Parcelable state) {
-//        super.onRestoreInstanceState(state);
-//        if(state instanceof SaveState){
-//            SaveState bean = (SaveState) state;
-//            allItemFrames = bean.allItemsFrames;
-//            mViewTypeSizes = bean.mViewTypeSizes;
-//            positionMapViewTypes = bean.positionMapViewTypes;
-//            mFirstVisibleRowIndex = bean.mFirstVisibleRowIndex;
-//            mLastVisibleRowIndex = bean.mLastVisibleRowIndex;
-//            mNumcolumnsPerRow = bean.mNumcolumnsPerRow;
-//
-//            Log.i("FlowGridLayoutManager", "onRestoreInstanceState: mfirst:"+mFirstVisibleRowIndex);
-//        }
-//    }
 
     /**
      * 从下往上逆序填充  手机从上往下滑动的时候
@@ -247,7 +208,6 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
                 }
             }
         }
-        Log.i("FlowGridLayoutManager", "fillDown: mfirst:"+mFirstVisibleRowIndex);
         int minPos = mFirstVisibleRowIndex;
         mLastVisibleRowIndex = getItemCount() -1;
         if(getChildCount() > 0){
@@ -261,52 +221,21 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
             int width = getDecoratedMeasuredWidth(child);
             int height = getDecoratedMeasuredHeight(child);
             Rect frame = (Rect) allItemFrames.get(i);
+            PointOffset po;
             if (frame == null) {
                 frame = new Rect();
-                ItemPositionInfo posInfo = spansizeLookUp.getItemPositionInfo(i);
                 RowItem item = spansizeLookUp.getRowSpanItem(i);
-                int viewType = getItemViewType(child);
-                HashMap<Integer,Integer> viewtypeCount = new HashMap<>();
-                if(i > 0){//主要是用来记录当前position下的每个viewtype的数量
-                    if(!positionMapViewTypes.containsKey(i)){
-                        viewtypeCount = positionMapViewTypes.get(i-1);
-                        HashMap<Integer,Integer> copy = new HashMap<>();
-                        copy.putAll(viewtypeCount);
-                        if(copy.containsKey(viewType)){
-                            copy.put(viewType,copy.get(viewType)+1);
-                        }else{
-                            copy.put(viewType,1);
-                        }
-                        positionMapViewTypes.put(i,copy);
-                    }
-                }else{
-                    viewtypeCount.put(viewType,1);
-                    positionMapViewTypes.clear();
-                    positionMapViewTypes.put(i,viewtypeCount);
-                }
-                if(!mViewTypeSizes.containsKey(viewType)){
-                    int defaultWidth = width;
-                    int defaultHeight = height;
-                    if(viewType == spansizeLookUp.getDefaultViewType()){
-                        defaultWidth = (width - spansizeLookUp.getColumnSpacing()*(item.getColumnSpan()-1))/ item.getColumnSpan();
-                        defaultHeight = (height - spansizeLookUp.getRowSpancing() * (item.getColumnSpan()-1)) / item.getRowSpan();
-                    }
-                    ViewTypeSize  viewTypeSize = new ViewTypeSize(defaultWidth,defaultHeight);
-                    item.setDefaultHeight(defaultHeight);
-                    item.setDefaultWidth(defaultWidth);
-                    mViewTypeSizes.put(viewType,viewTypeSize);
-                }
-                int leftOffset = caculateLeftOffset(posInfo.getmCurrentColumnIndex());
-                int top = caculateTopOffset(i,viewType,posInfo.getRowIndex() - item.getRowSpan());
-                frame.set(leftOffset,top, leftOffset+width, top + height);
+                po = spansizeLookUp.calculateLeftTopCoordinate(i,width,height);
+                frame.left = po.leftOffset - width;
+                frame.top = po.topOffset - height;
+                frame.right = po.leftOffset;
+                frame.bottom = po.topOffset;
                 // 将当前的Item的Rect边界数据保存
                 allItemFrames.put(i, frame);
             }
             topOffset = frame.top - verticalScrollOffset;//判断这个view的头部是否已经露出屏幕下边缘，如果没有  那当前这个view不用展示
             if(topOffset -dy > getHeight() -getPaddingBottom()){
                 mLastVisibleRowIndex = i -1;
-                allItemFrames.remove(i);
-                spansizeLookUp.rollbackRowIndex(i);
                 removeAndRecycleView(child, recycler);
             }else{
                 layoutDecorated(child,
@@ -341,93 +270,98 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
 
 
     public abstract static class SpanSizeLookUp{
-        private List<Integer> mColumnPointRowIndex = new ArrayList<>();//记录当前最下面的item的行号
-        private Map<Integer,ItemPositionInfo> mRowItemInfos = new HashMap<>();
-        private int mNumcolumnsPerRow = 3;
-        public abstract int ItemCount();
+        private int mNumcolumnsPerRow = 0;
+        private int mPaddingTop;
+        private int mPaddingLeft;
+        private List<PointOffset> mColumnRowOffset = new ArrayList<>();
+        private int mLastNotSpacingRowIndex = -100;
+
         public abstract  RowItem getRowSpanItem(int position);
-        public abstract int getRowSpancing();
-        public abstract int getColumnSpacing();
-        public abstract int getDefaultViewType ();
+
+        public abstract  int getRowSpancing();
+        public abstract  int getColumnSpacing();
+        public abstract boolean shouldViewTypeHaveSpacing(int viewType);
         public SpanSizeLookUp(){
         }
-        private void setNumColumnCount(int numcolumnCount){
+        private void setNumColumnCount(int numcolumnCount,int paddingTop,int paddingLeft){
+            this.mPaddingLeft = paddingLeft;
+            this.mPaddingTop = paddingTop;
             this.mNumcolumnsPerRow = numcolumnCount;
-            mColumnPointRowIndex = new ArrayList<>();
             for(int i = 0 ; i < mNumcolumnsPerRow ; i++){
-                mColumnPointRowIndex.add(0);
+                PointOffset po = new PointOffset();
+                po.rowIndex = 0;
+                po.topOffset = mPaddingTop;
+                po.leftOffset = mPaddingLeft;
+                mColumnRowOffset.add(po);
             }
+
         }
-
         /**
-         * 计算并且保存每个item应该对应的行下标和列下标，当往下滑动的时候 逆序布局直接使用保存好的位置信息
-         */
-        private void caculateRowItemInfo(){
-            int currentColumnIndex = 0;
-            if (mRowItemInfos.size() > 0){
-                return;
-            }
-            for(int i = 0 ; i < ItemCount(); i ++){
-                RowItem item = getRowSpanItem(i);
-
-                currentColumnIndex = calculateCurrentColumnIndex();
-
-                if((mNumcolumnsPerRow - currentColumnIndex) < item.getColumnSpan()){
-                    currentColumnIndex = 0;
-                }
-                int rowIndex = mColumnPointRowIndex.get(currentColumnIndex);
-                for(int j = currentColumnIndex ; j < (currentColumnIndex+item.getColumnSpan()) ; j ++){
-                    if(mColumnPointRowIndex.get(j) > rowIndex){
-                        rowIndex ++;
-                        j = 0;
-                    }
-                }
-                for(int k = currentColumnIndex ;k < currentColumnIndex+item.getColumnSpan() ; k++ ){
-                    ItemPositionInfo itemPositionInfo = new ItemPositionInfo(i,rowIndex+item.getRowSpan(),item,currentColumnIndex);
-                    mColumnPointRowIndex.set(k,rowIndex+item.getRowSpan());
-                    mRowItemInfos.put(i,itemPositionInfo);
-                }
-            }
-        }
-
-        /**
-         * 按照瀑布流排列 计算当前item应该从哪一列开始排列
+         * 按照瀑布流排列 计算当前item的位置矩形
          * @return
          */
-        private int calculateCurrentColumnIndex(){
-            int min = 0 ;
-            for(int i = 0 ; i < mColumnPointRowIndex.size() ; i++ ){
-                if(mColumnPointRowIndex.get(i) < mColumnPointRowIndex.get(min)){
-                    min = i ;
+        private PointOffset calculateLeftTopCoordinate(int position, int width, int height){
+            int currentColumnIndex = 0;
+            for(int i = 0 ; i < mColumnRowOffset.size() ; i++ ){
+                if(mColumnRowOffset.get(i).rowIndex < mColumnRowOffset.get(currentColumnIndex).rowIndex){
+                    currentColumnIndex = i ;
                     break;
                 }
             }
-            return min;
-        }
 
-        /**
-         * 回滚当前position 的行下标
-         * @param position position
-         */
-        public void rollbackRowIndex(int position){
-            ItemPositionInfo posInfo = mRowItemInfos.get(position);
-            if(posInfo == null)return;
-            for(int i = posInfo.getmCurrentColumnIndex(); i < posInfo.getmCurrentColumnIndex()+posInfo.getItem().getColumnSpan();i++){
-                mColumnPointRowIndex.set(i,posInfo.getRowIndex() - posInfo.getItem().getRowSpan());
-            }
-        }
-
-        /**
-         * 返回当前position的 行位置信息
-         * @param position
-         * @return
-         */
-        public ItemPositionInfo getItemPositionInfo(int position){
-            if(position >= mRowItemInfos.size()){
-                return new ItemPositionInfo(0,0,new RowItem(),0);
+            RowItem item = getRowSpanItem(position);
+            if((mNumcolumnsPerRow - currentColumnIndex) < item.getColumnSpan()){
+                currentColumnIndex = 0;
             }
 
-            return mRowItemInfos.get(position);
+            int rowIndex = mColumnRowOffset.get(currentColumnIndex).rowIndex;
+            int start = currentColumnIndex;
+            int end = currentColumnIndex+item.getColumnSpan();
+            int currentColumTopOffset = 0;
+            int currentLeftOffset = 0;
+            for(int j = start ; j < end ; j ++){
+                if(mColumnRowOffset.get(j).rowIndex > rowIndex){
+                    currentColumTopOffset = 0;
+                    int offset = j+1+(end -start);
+                    if(offset < mNumcolumnsPerRow){
+                        start = j+1;
+                        end = offset;
+                        j = start;
+                    }else{
+                        rowIndex ++;
+                        start = 0 ;
+                        end = start + item.getColumnSpan();
+                        j = 0;
+                    }
+                }
+                if(mColumnRowOffset.get(j).topOffset > currentColumTopOffset){
+                    currentColumTopOffset = mColumnRowOffset.get(j).topOffset;
+                }
+
+            }
+            if(start == 0){
+                currentLeftOffset = mPaddingLeft;
+            }else{
+                currentLeftOffset = mColumnRowOffset.get(start -1).leftOffset;
+            }
+            PointOffset po = new PointOffset();
+            po.rowIndex = rowIndex+item.getRowSpan();
+            po.topOffset = currentColumTopOffset + (rowIndex != 0?getRowSpancing():0)+height;
+            po.leftOffset = currentLeftOffset + (start != 0?getColumnSpacing():0) + width;
+            po.start = start;
+            po.end = end;
+
+            if((rowIndex -1) == mLastNotSpacingRowIndex){
+                po.topOffset -= getRowSpancing();
+            }
+            if(!shouldViewTypeHaveSpacing(item.getViewType())){
+                mLastNotSpacingRowIndex = rowIndex;
+                po.topOffset -= getRowSpancing();
+            }
+            for(int k = start ;k < end ; k++ ){
+                mColumnRowOffset.set(k,po);
+            }
+            return po;
         }
     }
 
@@ -435,43 +369,15 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
         private int columnSpan;//所占的列的宽度
         private int RowSpan;//所占的行的宽度
         private int index;//item index
-        private int viewType = 0; //viewTye  以后做支持多类型扩展
-        private int columnSpacing;
-        private int rowSpacing;
         private T itemData;
-        private int defaultWidth;
-        private int defaultHeight;
+        private int viewType;
 
-        public int getDefaultWidth() {
-            return defaultWidth;
+        public int getViewType() {
+            return viewType;
         }
 
-        public void setDefaultWidth(int defaultWidth) {
-            this.defaultWidth = defaultWidth;
-        }
-
-        public int getDefaultHeight() {
-            return defaultHeight;
-        }
-
-        public void setDefaultHeight(int defaultHeight) {
-            this.defaultHeight = defaultHeight;
-        }
-
-        public int getColumnSpacing() {
-            return columnSpacing;
-        }
-
-        public void setColumnSpacing(int columnSpacing) {
-            this.columnSpacing = columnSpacing;
-        }
-
-        public int getRowSpacing() {
-            return rowSpacing;
-        }
-
-        public void setRowSpacing(int rowSpacing) {
-            this.rowSpacing = rowSpacing;
+        public void setViewType(int viewType) {
+            this.viewType = viewType;
         }
 
         public T getItemData() {
@@ -483,14 +389,6 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
 
         public void setItemData(T itemData) {
             this.itemData = itemData;
-        }
-
-        public int getViewType() {
-            return viewType;
-        }
-
-        public void setViewType(int viewType) {
-            this.viewType = viewType;
         }
 
         public int getColumnSpan() {
@@ -522,18 +420,10 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
      * 默认的SpanSizeLookUp的实现，每个item占用一行一列
      */
     public static final class DefualtSpanSizeLookUp extends SpanSizeLookUp{
-        private int itemCount = 0;
-        public DefualtSpanSizeLookUp(int numcolumnCount,int itemCount) {
+
+        public DefualtSpanSizeLookUp() {
             super();
-            this.itemCount = itemCount;
-            super.setNumColumnCount(numcolumnCount);
         }
-
-        @Override
-        public int ItemCount() {
-            return itemCount;
-        }
-
         @Override
         public RowItem getRowSpanItem(int position) {
             RowItem item = new RowItem();
@@ -554,160 +444,17 @@ public class FlowGridLayoutManager extends RecyclerView.LayoutManager {
         }
 
         @Override
-        public int getDefaultViewType() {
-            return 0;
+        public boolean shouldViewTypeHaveSpacing(int viewType) {
+            return true;
         }
-
 
     }
-
-    public static class ViewTypeSize implements Parcelable{
-        private int mDefaultWidth;
-        private int mDefaulTHeight;
-
-
-        protected ViewTypeSize(Parcel in) {
-            mDefaultWidth = in.readInt();
-            mDefaulTHeight = in.readInt();
-        }
-
-        @Override
-        public void writeToParcel(Parcel dest, int flags) {
-            dest.writeInt(mDefaultWidth);
-            dest.writeInt(mDefaulTHeight);
-        }
-
-        @Override
-        public int describeContents() {
-            return 0;
-        }
-
-        public static final Creator<ViewTypeSize> CREATOR = new Creator<ViewTypeSize>() {
-            @Override
-            public ViewTypeSize createFromParcel(Parcel in) {
-                return new ViewTypeSize(in);
-            }
-
-            @Override
-            public ViewTypeSize[] newArray(int size) {
-                return new ViewTypeSize[size];
-            }
-        };
-
-        public int getmDefaultWidth() {
-            return mDefaultWidth;
-        }
-
-        public void setmDefaultWidth(int mDefaultWidth) {
-            this.mDefaultWidth = mDefaultWidth;
-        }
-
-        public int getmDefaulTHeight() {
-            return mDefaulTHeight;
-        }
-
-        public void setmDefaulTHeight(int mDefaulTHeight) {
-            this.mDefaulTHeight = mDefaulTHeight;
-        }
-        public ViewTypeSize(int mDefaultWidth, int mDefaulTHeight) {
-            this.mDefaultWidth = mDefaultWidth;
-            this.mDefaulTHeight = mDefaulTHeight;
-        }
+    public static class PointOffset{
+        int rowIndex;
+        int topOffset;
+        int leftOffset;
+        int start;
+        int end;
     }
 
-    /**
-     * 计算每个position对应的item的top偏移量
-     * @param position 对应的item 下标
-     * @param viewType  当前要计算的viewtype
-     * @param currentRowIndex 当前起始行下标
-     * @return
-     */
-    private int caculateTopOffset(int position ,int viewType,int currentRowIndex){
-        int topOffset = getPaddingTop();
-        int notDefaultViewTypeCount = 0 ;
-        if(currentRowIndex == 0)return topOffset;
-        Map<Integer,Integer> typeCount = positionMapViewTypes.get(position);
-        for(Integer key:typeCount.keySet()){  //这段逻辑真的死恶心  不是宫格的view 不能让他有行列间隔，因为为了避免可能 titleview的间隔小于行列间隔
-            if(key != spansizeLookUp.getDefaultViewType()){
-                ViewTypeSize size = mViewTypeSizes.get(key);
-                int count = typeCount.get(key);
-                if(key == viewType){
-                    count --;
-                }
-                notDefaultViewTypeCount += count;
-                topOffset+= count*size.getmDefaulTHeight();
-            }
-        }
-        int spacingCount = (currentRowIndex+1) - notDefaultViewTypeCount*2 - (viewType == spansizeLookUp.getDefaultViewType()?0:1);
-        if(spacingCount < 0){
-            spacingCount = 0;
-        }
-        int defaultHeight = 0;
-        if(mViewTypeSizes.containsKey(spansizeLookUp.getDefaultViewType())){
-            defaultHeight = mViewTypeSizes.get(spansizeLookUp.getDefaultViewType()).getmDefaulTHeight();
-        }
-        topOffset += spacingCount*spansizeLookUp.getRowSpancing()+defaultHeight*(currentRowIndex - notDefaultViewTypeCount);
-        return topOffset;
-    }
-
-    private int caculateLeftOffset(int currentColumnIndex){
-        int leftOffset = getPaddingLeft();
-        int defaultWidth = 0;
-        if(mViewTypeSizes.containsKey(spansizeLookUp.getDefaultViewType())){
-            defaultWidth = mViewTypeSizes.get(spansizeLookUp.getDefaultViewType()).getmDefaultWidth();
-        }
-        leftOffset += (currentColumnIndex * (spansizeLookUp.getColumnSpacing() + defaultWidth));
-        return leftOffset;
-    }
-
-
-//    public static class SaveState implements Parcelable{
-//        int verticalScrollOffset = 0;
-//        HashMap<Integer,ViewTypeSize> mViewTypeSizes;
-//        SparseArray<Object> allItemsFrames ;
-//        int mNumcolumnsPerRow ;
-//        int mLastVisibleRowIndex = 0;
-//        int mFirstVisibleRowIndex = 0;
-//        HashMap<Integer,HashMap<Integer,Integer>> positionMapViewTypes;
-//        public SaveState(){}
-//
-//        protected SaveState(Parcel in) {
-//            verticalScrollOffset = in.readInt();
-//            mNumcolumnsPerRow = in.readInt();
-//            mLastVisibleRowIndex = in.readInt();
-//            mFirstVisibleRowIndex = in.readInt();
-//
-//            mViewTypeSizes = in.readHashMap(FlowGridLayoutManager.class.getClassLoader());
-//            positionMapViewTypes = in.readHashMap(FlowGridLayoutManager.class.getClassLoader());
-//            allItemsFrames = in.readSparseArray(FlowGridLayoutManager.class.getClassLoader());
-//        }
-//
-//        @Override
-//        public void writeToParcel(Parcel dest, int flags) {
-//            dest.writeInt(verticalScrollOffset);
-//            dest.writeInt(mNumcolumnsPerRow);
-//            dest.writeInt(mLastVisibleRowIndex);
-//            dest.writeInt(mFirstVisibleRowIndex);
-//            dest.writeMap(mViewTypeSizes);
-//            dest.writeMap(positionMapViewTypes);
-//            dest.writeSparseArray(allItemsFrames);
-//        }
-//
-//        @Override
-//        public int describeContents() {
-//            return 0;
-//        }
-//
-//        public static final Creator<SaveState> CREATOR = new Creator<SaveState>() {
-//            @Override
-//            public SaveState createFromParcel(Parcel in) {
-//                return new SaveState(in);
-//            }
-//
-//            @Override
-//            public SaveState[] newArray(int size) {
-//                return new SaveState[size];
-//            }
-//        };
-//    }
 }
